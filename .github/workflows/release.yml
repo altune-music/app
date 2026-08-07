@@ -140,7 +140,7 @@ jobs:
 
           # Ensure the executable is discoverable by linuxdeploy/appimagetool
           mkdir -p "$APPDIR/usr/bin"
-          ln -sf ../altune "$APPDIR/usr/bin/altune"
+          ln -sf ../../altune "$APPDIR/usr/bin/altune"
 
           # Verify files exist
           ls -la "$APPDIR/altune.desktop" "$APPDIR/altune.png" "$APPDIR/altune" "$APPDIR/usr/bin/altune"
