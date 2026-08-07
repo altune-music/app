@@ -143,6 +143,7 @@ jobs:
 
           ./linuxdeploy-x86_64.AppImage \
             --appdir "$APPDIR" \
+            --executable "$APPDIR/altune" \
             --desktop-file "$APPDIR/altune.desktop" \
             --icon-file "$APPDIR/altune.png" \
             --output appimage
