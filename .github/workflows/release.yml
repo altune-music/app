@@ -115,10 +115,29 @@ jobs:
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get install -y libfuse2 librsvg2-bin
           wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
-          ./linuxdeploy-x86_64.AppImage --appdir build/linux/x64/release/bundle --output appimage
+
+          # Create desktop file in AppDir root
+          cat > build/linux/x64/release/bundle/altune.desktop <<EOF
+          [Desktop Entry]
+          Name=Altune
+          Comment=Music Player
+          Exec=altune
+          Icon=altune
+          Type=Application
+          Categories=AudioVideo;Player;
+          EOF
+
+          # Convert SVG icon to PNG for AppImage
+          rsvg-convert -o build/linux/x64/release/bundle/altune.png assets/app_icon.svg
+
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir build/linux/x64/release/bundle \
+            --desktop-file build/linux/x64/release/bundle/altune.desktop \
+            --icon-file build/linux/x64/release/bundle/altune.png \
+            --output appimage
           appimage=$(find . -maxdepth 1 -name '*.AppImage' -type f | head -n1)
           if [ -z "$appimage" ]; then
             echo "No AppImage produced"
