@@ -138,12 +138,16 @@ jobs:
           # Convert SVG icon to PNG for AppImage
           rsvg-convert -o "$APPDIR/altune.png" assets/app_icon.svg
 
+          # Ensure the executable is discoverable by linuxdeploy/appimagetool
+          mkdir -p "$APPDIR/usr/bin"
+          ln -sf ../altune "$APPDIR/usr/bin/altune"
+
           # Verify files exist
-          ls -la "$APPDIR/altune.desktop" "$APPDIR/altune.png"
+          ls -la "$APPDIR/altune.desktop" "$APPDIR/altune.png" "$APPDIR/altune" "$APPDIR/usr/bin/altune"
 
           ./linuxdeploy-x86_64.AppImage \
             --appdir "$APPDIR" \
-            --executable "$APPDIR/altune" \
+            --executable "$APPDIR/usr/bin/altune" \
             --desktop-file "$APPDIR/altune.desktop" \
             --icon-file "$APPDIR/altune.png" \
             --output appimage
