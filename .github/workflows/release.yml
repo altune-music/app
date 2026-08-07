@@ -38,23 +38,97 @@ jobs:
       - name: Run tests
         run: flutter test
 
-  build:
-    name: Build ${{ matrix.target }}
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
     needs: quality
-    outputs:
-      VERSION: ${{ steps.set_version.outputs.VERSION }}
-      BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: android-apk
-            path: build/app/outputs/flutter-apk/altune-${{ github.ref_name }}.apk
-            name: altune-${{ github.ref_name }}.apk
-          - target: linux
-            path: build/linux/x64/release/altune-${{ github.ref_name }}.AppImage
-            name: altune-${{ github.ref_name }}.AppImage
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Set version
+        id: set_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BUILD_NUMBER=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Decode keystore
+        run: |
+          mkdir -p android/app
+          printf "%s" "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          ls -l android/app/keystore.jks
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=altune
+          storeFile=keystore.jks
+          EOF
+
+      - name: Build APK
+        run: flutter build apk --release \
+          --build-name ${{ steps.set_version.outputs.VERSION }} \
+          --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
+        env:
+          VERSION: ${{ steps.set_version.outputs.VERSION }}
+          BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
+
+      - name: Rename APK
+        run: |
+          if [ ! -f build/app/outputs/flutter-apk/app-release.apk ]; then
+            echo "APK not found"
+            exit 1
+          fi
+          mv build/app/outputs/flutter-apk/app-release.apk \
+            altune-${{ steps.set_version.outputs.VERSION }}.apk
+
+      - name: Generate checksum
+        run: sha256sum altune-${{ steps.set_version.outputs.VERSION }}.apk \
+          > altune-${{ steps.set_version.outputs.VERSION }}.apk.sha256
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: altune-${{ steps.set_version.outputs.VERSION }}
+          path: |
+            altune-${{ steps.set_version.outputs.VERSION }}.apk
+            altune-${{ steps.set_version.outputs.VERSION }}.apk.sha256
+
+      - name: Cleanup signing files
+        if: always()
+        run: rm -f android/app/keystore.jks android/key.properties
+
+  build-linux:
+    name: Build Linux packages
+    runs-on: ubuntu-latest
+    needs: quality
 
     steps:
       - uses: actions/checkout@v6
@@ -86,26 +160,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install Linux dependencies
-        if: matrix.target == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y \
+          libgtk-3-dev librsvg2-bin ruby-dev build-essential
 
-      - name: Decode keystore
-        if: matrix.target == 'android-apk'
-        run: |
-          mkdir -p android/app
-          printf "%s" "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-          ls -l android/app/keystore.jks
-
-      - name: Create key.properties
-        if: matrix.target == 'android-apk'
-        run: |
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=altune
-          storeFile=keystore.jks
-          EOF
+      - name: Install fpm
+        run: gem install --no-document fpm
 
       - name: Set version
         id: set_version
@@ -118,100 +178,80 @@ jobs:
           BUILD_NUMBER="${{ github.run_number }}"
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "VERSION=${VERSION}"
-          echo "BUILD_NUMBER=${BUILD_NUMBER}"
 
-      - name: Build ${{ matrix.target }}
+      - name: Build Linux
+        run: flutter build linux --release \
+          --build-name ${{ steps.set_version.outputs.VERSION }} \
+          --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
+        env:
+          VERSION: ${{ steps.set_version.outputs.VERSION }}
+          BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
+
+      - name: Package tarball
         run: |
-          if [ "${{ matrix.target }}" = "android-apk" ]; then
-            flutter build apk --release \
-              --build-name ${VERSION#v} \
-              --build-number ${{ env.BUILD_NUMBER }}
-          else
-            flutter build linux \
-              --build-name ${VERSION#v} \
-              --build-number ${{ env.BUILD_NUMBER }}
-          fi
+          tar czf altune-${{ steps.set_version.outputs.VERSION }}-linux-x64.tar.gz \
+            -C build/linux/x64/release/bundle .
 
-      - name: Rename Android APK
-        if: matrix.target == 'android-apk'
+      - name: Package deb and rpm
         run: |
-          if [ ! -f build/app/outputs/flutter-apk/app-release.apk ]; then
-            echo "APK not found"
-            exit 1
-          fi
-          mv build/app/outputs/flutter-apk/app-release.apk ${{ matrix.path }}
+          VERSION=${{ github.run_number }}
+          STAGING=package-staging
 
-      - name: Package AppImage
-        if: matrix.target == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libfuse2 librsvg2-bin
-          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/0f3b5e5/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
+          mkdir -p ${STAGING}/opt/altune
+          mkdir -p ${STAGING}/usr/bin
+          mkdir -p ${STAGING}/usr/share/applications
+          mkdir -p ${STAGING}/usr/share/icons/hicolor/128x128/apps
 
-          APPDIR=build/linux/x64/release/bundle
+          cp -r build/linux/x64/release/bundle/* ${STAGING}/opt/altune/
 
-          # Create desktop file in AppDir root
-          cat > "$APPDIR/altune.desktop" <<EOF
+          cat > ${STAGING}/usr/bin/altune <<'EOF'
+          #!/bin/bash
+          exec /opt/altune/altune "$@"
+          EOF
+          chmod +x ${STAGING}/usr/bin/altune
+
+          cat > ${STAGING}/usr/share/applications/altune.desktop <<EOF
           [Desktop Entry]
+          Type=Application
           Name=Altune
           Comment=Music Player
           Exec=altune
           Icon=altune
-          Type=Application
           Categories=AudioVideo;Player;
           EOF
 
-          # Convert SVG icon to PNG for AppImage
-          rsvg-convert -o "$APPDIR/altune.png" assets/app_icon.svg
+          rsvg-convert -o ${STAGING}/usr/share/icons/hicolor/128x128/apps/altune.png \
+            assets/app_icon.svg
 
-          # Ensure the executable is discoverable by linuxdeploy/appimagetool
-          mkdir -p "$APPDIR/usr/bin"
-          ln -sf ../../altune "$APPDIR/usr/bin/altune"
+          fpm -s dir -t deb -n altune -v ${VERSION} --architecture amd64 \
+            --depends libgtk-3-0 --depends libblkid1 --depends liblzma5 \
+            --description "Altune Music Player" \
+            --package altune-${{ steps.set_version.outputs.VERSION }}_amd64.deb \
+            -C ${STAGING} .
 
-          # Verify files exist
-          ls -la "$APPDIR/altune.desktop" "$APPDIR/altune.png" "$APPDIR/altune" "$APPDIR/usr/bin/altune"
-
-          ./linuxdeploy-x86_64.AppImage \
-            --appdir "$APPDIR" \
-            --executable "$APPDIR/usr/bin/altune" \
-            --desktop-file "$APPDIR/altune.desktop" \
-            --icon-file "$APPDIR/altune.png" \
-            --output appimage
-          appimage=$(find . -maxdepth 1 -name '*.AppImage' -type f | head -n1)
-          if [ -z "$appimage" ]; then
-            echo "No AppImage produced"
-            exit 1
-          fi
-          mv "$appimage" ${{ matrix.path }}
+          fpm -s dir -t rpm -n altune -v ${VERSION} --architecture x86_64 \
+            --depends gtk3 --depends lzma --depends util-linux \
+            --description "Altune Music Player" \
+            --package altune-${{ steps.set_version.outputs.VERSION }}_x86_64.rpm \
+            -C ${STAGING} .
 
       - name: Generate checksums
         run: |
-          if [ -f "${{ matrix.path }}" ]; then
-            cd "$(dirname "${{ matrix.path }}")"
-            sha256sum "$(basename "${{ matrix.path }}")" > "$(basename "${{ matrix.path }}").sha256"
-          fi
+          sha256sum altune-* > checksums.txt
 
-      - name: Upload artifact
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.name }}
-          path: ${{ matrix.path }}
-
-      - name: Upload checksum artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.name }}-checksum
-          path: ${{ matrix.path }}.sha256
-
-      - name: Cleanup signing files
-        if: always()
-        run: rm -f android/app/keystore.jks android/key.properties
+          name: altune-${{ steps.set_version.outputs.VERSION }}-linux
+          path: |
+            altune-${{ steps.set_version.outputs.VERSION }}-linux-x64.tar.gz
+            altune-${{ steps.set_version.outputs.VERSION }}_amd64.deb
+            altune-${{ steps.set_version.outputs.VERSION }}_x86_64.rpm
+            checksums.txt
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [build-android, build-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
