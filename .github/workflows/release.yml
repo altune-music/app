@@ -40,11 +40,11 @@ jobs:
       matrix:
         include:
           - target: android-apk
-            path: build/app/outputs/flutter-apk/altune-${{ env.VERSION }}.apk
-            name: altune-${{ env.VERSION }}.apk
+            path: build/app/outputs/flutter-apk/altune-${{ github.ref_name }}.apk
+            name: altune-${{ github.ref_name }}.apk
           - target: linux
-            path: build/linux/x64/release/altune-${{ env.VERSION }}.AppImage
-            name: altune-${{ env.VERSION }}.AppImage
+            path: build/linux/x64/release/altune-${{ github.ref_name }}.AppImage
+            name: altune-${{ github.ref_name }}.AppImage
 
     steps:
       - uses: actions/checkout@v4
