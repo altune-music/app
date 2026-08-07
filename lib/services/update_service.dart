@@ -147,7 +147,10 @@ class UpdateService {
   /// Splits a version string into numeric segments, ignoring any
   /// non-numeric suffix (e.g. "-beta", "+build").
   List<int> _parseVersion(String version) {
-    final stripped = version.split('-').first.split('+').first;
+    var stripped = version.split('-').first.split('+').first;
+    if (stripped.startsWith('v')) {
+      stripped = stripped.substring(1);
+    }
     return stripped.split('.').map((s) {
       try {
         return int.parse(s);

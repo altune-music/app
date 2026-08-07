@@ -102,11 +102,11 @@ jobs:
         run: |
           if [ "${{ matrix.target }}" = "android-apk" ]; then
             flutter build apk --release \
-              --build-name ${{ env.VERSION }} \
+              --build-name ${VERSION#v} \
               --build-number ${{ env.BUILD_NUMBER }}
           else
             flutter build linux \
-              --build-name ${{ env.VERSION }} \
+              --build-name ${VERSION#v} \
               --build-number ${{ env.BUILD_NUMBER }}
           fi
 

@@ -89,6 +89,25 @@ void main() {
         expect(result, isNull);
       });
 
+      test('returns null when installed version has v prefix', () async {
+        final service = UpdateService(
+          client: _MockClient(
+            jsonEncode({
+              'tag_name': 'v1.0.0',
+              'name': 'v1.0.0',
+              'body': 'Release',
+              'html_url':
+                  'https://github.com/altune-music/app/releases/tag/v1.0.0',
+            }),
+          ),
+          testVersion: 'v1.0.0',
+        );
+
+        final result = await service.checkForUpdates();
+
+        expect(result, isNull);
+      });
+
       test('returns null when installed version is newer', () async {
         final service = UpdateService(
           client: _MockClient(
