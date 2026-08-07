@@ -76,13 +76,16 @@ jobs:
           if [ "${{ matrix.target }}" = "android-apk" ]; then
             flutter build apk --release \
               --build-name ${{ env.VERSION }} \
-              --build-number ${{ env.BUILD_NUMBER }} \
-              --output ${{ matrix.path }}
+              --build-number ${{ env.BUILD_NUMBER }}
           else
             flutter build linux \
               --build-name ${{ env.VERSION }} \
               --build-number ${{ env.BUILD_NUMBER }}
           fi
+
+      - name: Rename Android APK
+        if: matrix.target == 'android-apk'
+        run: mv build/app/outputs/flutter-apk/app-release.apk ${{ matrix.path }}
 
       - name: Package AppImage
         if: matrix.target == 'linux'
