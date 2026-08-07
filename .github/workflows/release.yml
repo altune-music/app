@@ -83,7 +83,7 @@ jobs:
 
       - name: Decode keystore
         if: matrix.target == 'android-apk'
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
       - name: Create key.properties
         if: matrix.target == 'android-apk'
