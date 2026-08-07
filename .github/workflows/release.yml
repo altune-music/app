@@ -5,6 +5,15 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.2.3)'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -33,9 +42,9 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
     needs: quality
-    env:
-      VERSION: ${{ github.ref_name }}
-      BUILD_NUMBER: ${{ github.run_number }}
+    outputs:
+      VERSION: ${{ steps.set_version.outputs.VERSION }}
+      BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
     strategy:
       fail-fast: false
       matrix:
@@ -98,6 +107,20 @@ jobs:
           storeFile=keystore.jks
           EOF
 
+      - name: Set version
+        id: set_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BUILD_NUMBER=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VERSION}"
+          echo "BUILD_NUMBER=${BUILD_NUMBER}"
+
       - name: Build ${{ matrix.target }}
         run: |
           if [ "${{ matrix.target }}" = "android-apk" ]; then
@@ -112,14 +135,19 @@ jobs:
 
       - name: Rename Android APK
         if: matrix.target == 'android-apk'
-        run: mv build/app/outputs/flutter-apk/app-release.apk ${{ matrix.path }}
+        run: |
+          if [ ! -f build/app/outputs/flutter-apk/app-release.apk ]; then
+            echo "APK not found"
+            exit 1
+          fi
+          mv build/app/outputs/flutter-apk/app-release.apk ${{ matrix.path }}
 
       - name: Package AppImage
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 librsvg2-bin
-          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/0f3b5e5/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
 
           APPDIR=build/linux/x64/release/bundle
@@ -158,11 +186,28 @@ jobs:
           fi
           mv "$appimage" ${{ matrix.path }}
 
+      - name: Generate checksums
+        run: |
+          if [ -f "${{ matrix.path }}" ]; then
+            cd "$(dirname "${{ matrix.path }}")"
+            sha256sum "$(basename "${{ matrix.path }}")" > "$(basename "${{ matrix.path }}").sha256"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.path }}
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.name }}-checksum
+          path: ${{ matrix.path }}.sha256
+
+      - name: Cleanup signing files
+        if: always()
+        run: rm -f android/app/keystore.jks android/key.properties
 
   release:
     name: Create GitHub Release
