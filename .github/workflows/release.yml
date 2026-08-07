@@ -119,8 +119,10 @@ jobs:
           wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
 
+          APPDIR=build/linux/x64/release/bundle
+
           # Create desktop file in AppDir root
-          cat > build/linux/x64/release/bundle/altune.desktop <<EOF
+          cat > "$APPDIR/altune.desktop" <<EOF
           [Desktop Entry]
           Name=Altune
           Comment=Music Player
@@ -131,12 +133,15 @@ jobs:
           EOF
 
           # Convert SVG icon to PNG for AppImage
-          rsvg-convert -o build/linux/x64/release/bundle/altune.png assets/app_icon.svg
+          rsvg-convert -o "$APPDIR/altune.png" assets/app_icon.svg
+
+          # Verify files exist
+          ls -la "$APPDIR/altune.desktop" "$APPDIR/altune.png"
 
           ./linuxdeploy-x86_64.AppImage \
-            --appdir build/linux/x64/release/bundle \
-            --desktop-file build/linux/x64/release/bundle/altune.desktop \
-            --icon-file build/linux/x64/release/bundle/altune.png \
+            --appdir "$APPDIR" \
+            --desktop-file "$APPDIR/altune.desktop" \
+            --icon-file "$APPDIR/altune.png" \
             --output appimage
           appimage=$(find . -maxdepth 1 -name '*.AppImage' -type f | head -n1)
           if [ -z "$appimage" ]; then
