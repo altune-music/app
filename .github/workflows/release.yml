@@ -57,6 +57,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Install Linux dependencies
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+
       - name: Decode keystore
         if: matrix.target == 'android-apk'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
