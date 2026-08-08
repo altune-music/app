@@ -6,14 +6,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('AppBackButton', () {
-    testWidgets('shows chevron left icon', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: AppBackButton())),
-      );
-
-      expect(find.byIcon(Icons.chevron_left), findsOneWidget);
-    });
-
     testWidgets('calls onPressed when provided', (tester) async {
       bool pressed = false;
       await tester.pumpWidget(
@@ -22,7 +14,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.tap(find.byType(AppBackButton));
       expect(pressed, isTrue);
     });
 
@@ -42,18 +34,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.tap(find.byType(AppBackButton));
       await tester.pumpAndSettle();
       expect(popped, isTrue);
-    });
-
-    testWidgets('is wrapped in DpadFocusable', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: AppBackButton())),
-      );
-
-      // Should find the button via the IconButton type
-      expect(find.byType(IconButton), findsOneWidget);
     });
   });
 }

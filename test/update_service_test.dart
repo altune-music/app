@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:altune/models/app_update.dart';
 import 'package:altune/services/update_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -190,16 +189,15 @@ void main() {
 
 /// A mock HTTP client that returns a fixed response body for GET requests.
 class _MockClient extends http.BaseClient {
-  _MockClient(this._body, {this.statusCode = 200});
+  _MockClient(this._body);
 
   final String _body;
-  final int statusCode;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     return http.StreamedResponse(
       Stream.value(utf8.encode(_body)),
-      statusCode,
+      200,
       contentLength: _body.length,
     );
   }
