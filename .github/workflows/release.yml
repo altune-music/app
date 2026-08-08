@@ -160,7 +160,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev librsvg2-bin ruby-dev build-essential
 
       - name: Install fpm
-        run: gem install --no-document fpm
+        run: sudo gem install --no-document fpm
 
       - name: Set version
         id: set_version
