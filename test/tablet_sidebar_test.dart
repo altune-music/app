@@ -18,7 +18,7 @@ void main() {
             selectedIndex: 0,
             onItemSelected: onItemSelected,
             playerManager: pm,
-        ),
+          ),
         ),
       );
     }

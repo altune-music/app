@@ -45,9 +45,7 @@ void main() {
       expect(played, isTrue);
     });
 
-    testWidgets('calls onPlayNext when Play Next is tapped', (
-      tester,
-    ) async {
+    testWidgets('calls onPlayNext when Play Next is tapped', (tester) async {
       bool called = false;
       await showModal(
         tester,
@@ -88,11 +86,7 @@ void main() {
       await showModal(
         tester,
         SongActionsModal(
-          song: Song(
-            id: '1',
-            name: 'Test Song',
-            primaryArtists: 'Test Artist',
-          ),
+          song: Song(id: '1', name: 'Test Song', primaryArtists: 'Test Artist'),
           isInLibrary: false,
           onPlay: () {},
           onToggleLibrary: () => called = true,

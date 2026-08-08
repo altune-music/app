@@ -188,10 +188,7 @@ void main() {
       bool skipped = false;
 
       await tester.pumpWidget(
-        buildSidebarPlayer(
-          playerManager: pm,
-          onSkipNext: () => skipped = true,
-        ),
+        buildSidebarPlayer(playerManager: pm, onSkipNext: () => skipped = true),
       );
 
       await tester.tap(find.byIcon(Icons.skip_next));
@@ -207,10 +204,7 @@ void main() {
       bool opened = false;
 
       await tester.pumpWidget(
-        buildSidebarPlayer(
-          playerManager: pm,
-          onTap: () => opened = true,
-        ),
+        buildSidebarPlayer(playerManager: pm, onTap: () => opened = true),
       );
 
       await tester.tap(find.byType(ArtworkImage));
