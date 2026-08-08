@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'package:altune/services/state_service.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:altune/services/state_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:jiosaavn/jiosaavn.dart';
@@ -9,6 +10,47 @@ import 'package:altune/models/song.dart';
 import 'package:altune/controllers/main_controller.dart';
 import 'package:altune/services/player_manager.dart';
 import 'package:altune/services/library_export_service.dart';
+
+class _MockAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final body = json.encode({
+      'id': options.path.split('/').last,
+      'name': 'Mock Song',
+      'type': 'song',
+      'album': {'id': 'al', 'name': 'Album', 'url': ''},
+      'year': '2024',
+      'releaseDate': '',
+      'duration': '0:30',
+      'label': '',
+      'primaryArtists': 'Artist',
+      'primaryArtistsId': '',
+      'featuredArtists': '',
+      'featuredArtistsId': '',
+      'explicitContent': 0,
+      'language': '',
+      'hasLyrics': '',
+      'url': '',
+      'copyright': '',
+      'image': [],
+      'downloadUrl': [],
+    });
+    return ResponseBody.fromBytes(
+      utf8.encode(body),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
 
 // Points getApplicationSupportDirectory at a real temp dir so saveState() and
 // exportLibrary() write files we can assert on, instead of the silent catch
@@ -43,6 +85,15 @@ void main() {
   JioSaavnClient deadClient() =>
       JioSaavnClient(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
 
+  JioSaavnClient mockClient() {
+    final client = JioSaavnClient();
+    client.albums.dio.httpClientAdapter = _MockAdapter();
+    client.artists.dio.httpClientAdapter = _MockAdapter();
+    client.songs.dio.httpClientAdapter = _MockAdapter();
+    client.search.dio.httpClientAdapter = _MockAdapter();
+    return client;
+  }
+
   SongResponse makeSongResponse(String id) => SongResponse(
     id: id,
     name: 'Song $id',
@@ -67,7 +118,7 @@ void main() {
 
   Future<void> waitFor(
     bool Function() condition, {
-    Duration timeout = const Duration(seconds: 2),
+    Duration timeout = const Duration(seconds: 5),
   }) async {
     final deadline = DateTime.now().add(timeout);
     while (!condition()) {
@@ -83,7 +134,7 @@ void main() {
     () async {
       final controller = MainController(
         stateService: StateService(),
-        client: deadClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -121,7 +172,7 @@ void main() {
     () async {
       final controller = MainController(
         stateService: StateService(),
-        client: deadClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [
           Song(id: 's1', name: 'A', primaryArtists: 'X', album: 'Al1'),
@@ -169,7 +220,7 @@ void main() {
   test('queue and current playing song persist in state and restore', () async {
     final controller = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [],
     );
@@ -205,7 +256,7 @@ void main() {
   test('orphaned queue songs persist as transient entries', () async {
     final writer = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [
         Song(id: 'lib1', name: 'Library', primaryArtists: 'A', album: 'Al'),
@@ -225,7 +276,7 @@ void main() {
 
     final reader = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [
         Song(id: 'lib1', name: 'Library', primaryArtists: 'A', album: 'Al'),
@@ -244,7 +295,7 @@ void main() {
     () async {
       final writer = MainController(
         stateService: StateService(),
-        client: deadClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -262,7 +313,7 @@ void main() {
       // Simulate an app restart: a brand-new controller loads the persisted state.
       final reader = MainController(
         stateService: StateService(),
-        client: deadClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -278,7 +329,7 @@ void main() {
   test('streamSongAndQueueAlbum sets queue to album songs', () async {
     final controller = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [],
     );
@@ -299,7 +350,7 @@ void main() {
   test('sort modes persist in state and restore across loadState', () async {
     final writer = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [],
     );
@@ -311,7 +362,7 @@ void main() {
 
     final reader = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [],
     );
@@ -325,7 +376,7 @@ void main() {
   test('restore library merges songs and playlists from backup', () async {
     final controller = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [
         Song(id: 'existing', name: 'Keep', primaryArtists: 'A', album: 'Al'),
@@ -375,7 +426,7 @@ void main() {
 
     final controller = MainController(
       stateService: StateService(),
-      client: deadClient(),
+      client: mockClient(),
       playerManager: PlayerManager(),
       localSongs: [],
     );

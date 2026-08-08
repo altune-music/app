@@ -1,13 +1,64 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:altune/services/state_service.dart';
+import 'package:dio/dio.dart';
 import 'package:jiosaavn/jiosaavn.dart';
 import 'package:altune/models/saved_playlist.dart';
 import 'package:altune/models/song.dart';
 import 'package:altune/controllers/main_controller.dart';
 import 'package:altune/services/player_manager.dart';
 
+class _MockAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final body = json.encode({
+      'id': options.path.split('/').last,
+      'name': 'Mock Song',
+      'type': 'song',
+      'album': {'id': 'al', 'name': 'Album', 'url': ''},
+      'year': '2024',
+      'releaseDate': '',
+      'duration': '0:30',
+      'label': '',
+      'primaryArtists': 'Artist',
+      'primaryArtistsId': '',
+      'featuredArtists': '',
+      'featuredArtistsId': '',
+      'explicitContent': 0,
+      'language': '',
+      'hasLyrics': '',
+      'url': '',
+      'copyright': '',
+      'image': [],
+      'downloadUrl': [],
+    });
+    return ResponseBody.fromBytes(
+      utf8.encode(body),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  JioSaavnClient mockClient() {
+    final client = JioSaavnClient();
+    client.albums.dio.httpClientAdapter = _MockAdapter();
+    return client;
+  }
 
   group('SavedPlaylist', () {
     test('fromJson creates correct instance with all fields', () {
@@ -161,7 +212,7 @@ void main() {
     test('libraryPlaylist getter creates Library if missing', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -177,7 +228,7 @@ void main() {
     test('recentSongsPlaylist getter creates Recent Songs if missing', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -193,7 +244,7 @@ void main() {
     test('getPlaylistById finds system playlists', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -210,7 +261,7 @@ void main() {
     test('getPlaylistById returns null for unknown id', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -226,7 +277,7 @@ void main() {
     test('returns false when song not in Library playlist', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [Song(id: 's1', filePath: '')],
       );
@@ -238,7 +289,7 @@ void main() {
     test('returns true when song is in Library playlist', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -268,7 +319,7 @@ void main() {
       () async {
         final controller = MainController(
           stateService: StateService(),
-          client: JioSaavnClient(),
+          client: mockClient(),
           playerManager: PlayerManager(),
           localSongs: [],
         );
@@ -286,7 +337,7 @@ void main() {
     test('deletePlaylist removes a user playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -302,7 +353,7 @@ void main() {
     test('deletePlaylist does nothing for system playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -316,7 +367,7 @@ void main() {
     test('deletePlaylist does nothing when ID does not exist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -330,7 +381,7 @@ void main() {
     test('addToPlaylist adds a song ID to a user playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('s1'), makeSong('s2')],
       );
@@ -349,7 +400,7 @@ void main() {
     test('addToPlaylist does not add duplicates', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('s1')],
       );
@@ -374,7 +425,7 @@ void main() {
       () async {
         final controller = MainController(
           stateService: StateService(),
-          client: JioSaavnClient(),
+          client: mockClient(),
           playerManager: PlayerManager(),
           localSongs: [makeSong('s1')],
         );
@@ -390,7 +441,7 @@ void main() {
     test('removeFromPlaylist removes a song from a user playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('s1'), makeSong('s2')],
       );
@@ -417,7 +468,7 @@ void main() {
     test('removeFromPlaylist does nothing when song not in playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('s1'), makeSong('s2')],
       );
@@ -442,7 +493,7 @@ void main() {
       () async {
         final controller = MainController(
           stateService: StateService(),
-          client: JioSaavnClient(),
+          client: mockClient(),
           playerManager: PlayerManager(),
           localSongs: [makeSong('s1')],
         );
@@ -470,7 +521,7 @@ void main() {
     test('renamePlaylist renames a user playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -486,7 +537,7 @@ void main() {
     test('renamePlaylist does nothing for system playlist', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -500,7 +551,7 @@ void main() {
     test('addToPlaylist uses live playlist not stale arg', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('a'), makeSong('b'), makeSong('c')],
       );
@@ -520,7 +571,7 @@ void main() {
     test('removeFromPlaylist uses live playlist not stale arg', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [makeSong('a'), makeSong('b'), makeSong('c')],
       );
@@ -553,7 +604,7 @@ void main() {
       () async {
         final controller = MainController(
           stateService: StateService(),
-          client: JioSaavnClient(),
+          client: mockClient(),
           playerManager: PlayerManager(),
           localSongs: [makeSong('a'), makeSong('b'), makeSong('c')],
         );
@@ -596,7 +647,7 @@ void main() {
       () async {
         final controller = MainController(
           stateService: StateService(),
-          client: JioSaavnClient(),
+          client: mockClient(),
           playerManager: PlayerManager(),
           localSongs: [Song(id: '1', name: 'Song A', filePath: '')],
         );
@@ -626,7 +677,7 @@ void main() {
     test('removes from library but does not advance when paused', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [Song(id: '1', name: 'Song A', filePath: '')],
       );
@@ -656,7 +707,7 @@ void main() {
     test('removes from library and stops when last song in queue', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [Song(id: '1', name: 'Song A', filePath: '')],
       );
@@ -684,7 +735,7 @@ void main() {
     test('does nothing when no song is playing', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -697,7 +748,7 @@ void main() {
     test('adds song to library when not already there', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -725,7 +776,7 @@ void main() {
     test('adds local song to library when not already there', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [Song(id: 's1', name: 'S1', filePath: '')],
       );
@@ -742,7 +793,7 @@ void main() {
     test('removes local song from library when already there', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [Song(id: 's1', name: 'S1', filePath: '')],
       );
@@ -766,7 +817,7 @@ void main() {
     test('no-ops for null-like song without crashing', () async {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -796,7 +847,7 @@ void main() {
     test('plays song appears in Recent Songs', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -813,7 +864,7 @@ void main() {
     test('replaying song moves it to front of Recent Songs', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -830,7 +881,7 @@ void main() {
     test('Recent Songs evicts oldest when over cap', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -854,7 +905,7 @@ void main() {
     test('filters songs by name', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [
           Song(
@@ -888,7 +939,7 @@ void main() {
     test('matches artist and album', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [
           Song(
@@ -929,7 +980,7 @@ void main() {
     test('returns empty when no match', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [
           Song(
@@ -955,7 +1006,7 @@ void main() {
     test('onLibraryChanged callback is nullable', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
@@ -968,7 +1019,7 @@ void main() {
     test('onCurrentPlayingChanged setter accepts null', () {
       final controller = MainController(
         stateService: StateService(),
-        client: JioSaavnClient(),
+        client: mockClient(),
         playerManager: PlayerManager(),
         localSongs: [],
       );
