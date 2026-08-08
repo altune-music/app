@@ -93,3 +93,27 @@ elsewhere:
   sources (e.g., after app restart). For UI entry points that must work in that
   state (mini player, sidebar, full player), use `playCurrent()`, which falls
   through to `_onPlayRequested` to trigger URL resolution and playlist setup.
+
+## Release Pipeline Gotchas (2026-08-08)
+
+- **fpm version must be the app version, not the run number**: the `3882229`
+  refactor (drop AppImage, add deb/rpm) accidentally wired `github.run_number`
+  into the `fpm -v` flag, so `.deb`/`.rpm` reported versions like "87" instead
+  of the tag version. The same refactor also dropped the `${VERSION#v}`
+  stripping (from `b0534b4`) for `--build-name`. Always re-verify version
+  plumbing after a workflow refactor — it regresses silently and only shows up
+  as weird package metadata.
+- **deb/rpm/Android versionName reject a leading `v`**: `deb` versions must
+  start with a digit; pass `${VERSION#v}` to fpm and `--build-name`, and keep
+  the `v` only in artifact filenames.
+- **GitHub Actions secrets: never inline-interpolate into `run:` blocks**.
+  `printf "%s" "${{ secrets.X }}"` puts the secret on the process command line,
+  and an unquoted heredoc with inline secrets lets a password containing `$`,
+  backticks, or a literal `EOF` line inject shell. Pass secrets via `env:` and
+  reference `$VAR` — expansion is single-pass so the value can't re-inject.
+- **`_atomicWrite` was not atomic**: persist callbacks fire `saveState()`
+  unawaited, so two `writeAsString` calls can overlap and a concurrent reader
+  can hit a truncated or missing `altune_state.json` (CI-only flake in
+  `library_persistence_test.dart`, passed 6/6 locally). Fixed by writing a
+  sibling `.tmp` file and `rename()`-ing it into place (atomic on POSIX).
+  Don't trust the name — the old implementation was a plain truncating write.

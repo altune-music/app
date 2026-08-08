@@ -28,7 +28,15 @@ class StateService {
 
   Future<void> _atomicWrite(File file, String content) async {
     await file.parent.create(recursive: true);
-    await file.writeAsString(content);
+    // Write to a sibling temp file then rename into place. Persist callbacks
+    // fire saveState() unawaited, so two writes can overlap; a plain
+    // writeAsString leaves a window where a concurrent reader sees a
+    // truncated/missing state file (CI-only flake in library persistence
+    // tests). Rename is atomic on POSIX, so readers always see either the old
+    // or the complete new file.
+    final tmp = File('${file.path}.tmp');
+    await tmp.writeAsString(content);
+    await tmp.rename(file.path);
   }
 
   Future<void> saveState({

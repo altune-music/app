@@ -74,26 +74,38 @@ jobs:
             VERSION="${{ github.ref_name }}"
           fi
           BUILD_NUMBER="${{ github.run_number }}"
+          # deb/rpm and Android versionName reject a leading 'v' (deb versions
+          # must start with a digit); filenames keep the 'v' prefix.
+          VERSION_NO_V="${VERSION#v}"
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_NO_V=${VERSION_NO_V}" >> "$GITHUB_OUTPUT"
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           mkdir -p android/app
-          printf "%s" "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          # Secrets via env, not inline interpolation: keeps the keystore off the
+          # process command line and immune to shell metacharacter injection.
+          echo "${KEYSTORE_BASE64}" | base64 -d > android/app/keystore.jks
           ls -l android/app/keystore.jks
 
       - name: Create key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
+          # ${KEYSTORE_PASSWORD} expands single-pass inside the heredoc, so a
+          # password containing $, backticks, or quotes cannot inject shell.
           cat > android/key.properties <<EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEYSTORE_PASSWORD }}
+          storePassword=${KEYSTORE_PASSWORD}
+          keyPassword=${KEYSTORE_PASSWORD}
           keyAlias=altune
           storeFile=keystore.jks
           EOF
 
       - name: Build APK
-        run: flutter build apk --release --build-name ${{ steps.set_version.outputs.VERSION }} --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
+        run: flutter build apk --release --build-name ${{ steps.set_version.outputs.VERSION_NO_V }} --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
         env:
           VERSION: ${{ steps.set_version.outputs.VERSION }}
           BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
@@ -143,16 +155,6 @@ jobs:
           restore-keys: |
             pub-${{ runner.os }}-
 
-      - name: Cache Gradle
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
       - name: Install dependencies
         run: flutter pub get
 
@@ -171,11 +173,14 @@ jobs:
             VERSION="${{ github.ref_name }}"
           fi
           BUILD_NUMBER="${{ github.run_number }}"
+          # deb/rpm versions reject a leading 'v' (deb must start with a digit).
+          VERSION_NO_V="${VERSION#v}"
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_NO_V=${VERSION_NO_V}" >> "$GITHUB_OUTPUT"
           echo "BUILD_NUMBER=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Build Linux
-        run: flutter build linux --release --build-name ${{ steps.set_version.outputs.VERSION }} --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
+        run: flutter build linux --release --build-name ${{ steps.set_version.outputs.VERSION_NO_V }} --build-number ${{ steps.set_version.outputs.BUILD_NUMBER }}
         env:
           VERSION: ${{ steps.set_version.outputs.VERSION }}
           BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
@@ -186,7 +191,9 @@ jobs:
 
       - name: Package deb and rpm
         run: |
-          VERSION=${{ github.run_number }}
+          # Package metadata must carry the app version (no 'v'), not the run
+          # number — otherwise .deb/.rpm report nonsense versions like "87".
+          VERSION=${{ steps.set_version.outputs.VERSION_NO_V }}
           STAGING=package-staging
 
           mkdir -p ${STAGING}/opt/altune
