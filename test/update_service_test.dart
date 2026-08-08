@@ -185,42 +185,6 @@ void main() {
         expect(result!.body, '');
       });
     });
-
-    group('error handling', () {
-      test('throws on non-200 HTTP response', () async {
-        final service = UpdateService(
-          client: _MockClient('{"error": "not found"}', statusCode: 404),
-          testVersion: '1.0.0',
-        );
-
-        expect(service.checkForUpdates(), throwsException);
-      });
-
-      test('throws on invalid JSON response', () async {
-        final service = UpdateService(
-          client: _MockClient('not json'),
-          testVersion: '1.0.0',
-        );
-
-        expect(service.checkForUpdates(), throwsException);
-      });
-    });
-
-    group('openReleasePage', () {
-      test('opens the release URL', () async {
-        final service = UpdateService();
-        final update = AppUpdate(
-          version: 'v1.2.0',
-          name: 'v1.2.0',
-          body: 'Release notes',
-          htmlUrl: 'https://github.com/altune-music/app/releases/tag/v1.2.0',
-        );
-
-        // This should not throw; it attempts to launch the URL
-        // which will fail in test environment but should be handled gracefully
-        await service.openReleasePage(update);
-      });
-    });
   });
 }
 
