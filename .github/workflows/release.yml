@@ -185,6 +185,20 @@ jobs:
           VERSION: ${{ steps.set_version.outputs.VERSION }}
           BUILD_NUMBER: ${{ steps.set_version.outputs.BUILD_NUMBER }}
 
+      - name: Stamp version.json
+        # flutter build linux silently drops --build-name/--build-number: the
+        # CMake path uses toEnvironmentConfig(), which omits them, so
+        # flutter_assets/version.json keeps the pubspec default (0.0.0+0) and
+        # package_info_plus reports 0.0.0 in Settings. Rewrite it here, after
+        # the build, so all three Linux packages carry the real version.
+        run: |
+          VERSION=${{ steps.set_version.outputs.VERSION_NO_V }}
+          BUILD_NUMBER=${{ steps.set_version.outputs.BUILD_NUMBER }}
+          cat > build/linux/x64/release/bundle/data/flutter_assets/version.json <<EOF
+          {"app_name":"altune","version":"${VERSION}","build_number":"${BUILD_NUMBER}","package_name":"altune"}
+          EOF
+          cat build/linux/x64/release/bundle/data/flutter_assets/version.json
+
       - name: Package tarball
         run: |
           tar czf altune-${{ steps.set_version.outputs.VERSION }}-linux-x64.tar.gz -C build/linux/x64/release/bundle .
