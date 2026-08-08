@@ -117,3 +117,24 @@ elsewhere:
   `library_persistence_test.dart`, passed 6/6 locally). Fixed by writing a
   sibling `.tmp` file and `rename()`-ing it into place (atomic on POSIX).
   Don't trust the name — the old implementation was a plain truncating write.
+
+## Android Launch Crash — Context in Field Initializers (2026-08-08)
+
+- **`MainActivity` NPE'd at launch on every device** ("Unable to instantiate
+  activity ... `getPackageName()` on a null object reference"). Cause:
+  `private val FILE_PROVIDER_AUTHORITY = "$packageName.fileprovider"` — a field
+  initializer reads `Context.packageName`, but the framework attaches the
+  Context (sets `ContextWrapper.mBase`) only AFTER the constructor returns.
+  Field initializers run inside the constructor → NPE. Symptom: app dies
+  before the splash/launch background ever draws.
+- **Fix**: `by lazy { "$packageName.fileprovider" }` — evaluated on first use
+  inside the method channel handler, where the activity is attached.
+- **Gotcha**: an APK that "worked on an old phone" but crashes on a newer one
+  is often the same APK never having run anywhere — verify the actual APK on
+  an emulator before assuming device-specific behavior. Reproduced the crash
+  on an Android 15 x86_64 AVD with `adb install` + `am start` + `logcat -b
+  crash`; confirmed the fix the same way (process stays alive, 0 FATALs).
+- **Emulator setup on this machine**: AVDs live under
+  `~/.config/.android/avd` (XDG), so launch with
+  `ANDROID_AVD_HOME=~/.config/.android/avd emulator -avd <name> -no-window
+  -gpu swiftshader_indirect`. adb is on PATH via the mise android-sdk.

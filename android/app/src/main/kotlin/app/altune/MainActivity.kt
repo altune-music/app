@@ -14,7 +14,11 @@ import java.io.File
 class MainActivity : AudioServiceActivity() {
   private val CHANNEL = "altune/battery_settings"
   private val FILE_CHANNEL = "altune/file_provider"
-  private val FILE_PROVIDER_AUTHORITY = "$packageName.fileprovider"
+  // packageName reads Context.mBase, which is null during the constructor
+  // (the framework attaches the Context after instantiation). A field
+  // initializer here NPEs on every launch. Compute it lazily on first use,
+  // inside the method channel handler where the activity is attached.
+  private val FILE_PROVIDER_AUTHORITY by lazy { "$packageName.fileprovider" }
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
